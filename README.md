@@ -1,3 +1,5 @@
+![Unity Logo](https://assetstorev1-prd-cdn.unity3d.com/key-image/312a0b2a-6a6b-4882-ae33-17657bc12ec3.webp)
+
 # Sprite-Sheet-Changer-Tools
 
 <p><a href="https://www.youtube.com/watch?v=6lJJ6Xne4Uw">DOCUMENTATION</a> | <a href="https://www.youtube.com/channel/UChPLDhGF4iAOfbjaKogWZpA">YOUTUBE</a> | <a href="https://assetstore.unity.com/publishers/59076">ASSET STORE</a></p>
@@ -26,6 +28,6 @@
 
 <p><h2>How to use?</h2></p>
 
-YOUTUBE - https://www.youtube.com/watch?v=EkPaOXJe2oI
-
-<p>Screans</p>
+Tutorial #1 - https://www.youtube.com/watch?v=9pcY2zNGTmU
+<p></p>
+Tutorial #2 - https://www.youtube.com/watch?v=A6iCD3iONqg&t=63s

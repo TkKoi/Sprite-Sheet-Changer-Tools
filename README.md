@@ -2,7 +2,7 @@
 
 # Sprite-Sheet-Changer-Tools
 
-<p><a href="https://www.youtube.com/watch?v=6lJJ6Xne4Uw">DOCUMENTATION</a> | <a href="https://www.youtube.com/channel/UChPLDhGF4iAOfbjaKogWZpA">YOUTUBE</a> | <a href="https://assetstore.unity.com/publishers/59076">ASSET STORE</a></p>
+<p><a href="https://battle-stallion-fa2.notion.site/Spritesheet-Changer-Documentation-0ffc6ccf5abb49b98a289db6916e238a">DOCUMENTATION</a> | <a href="https://www.youtube.com/@amfich_assets/featured">YOUTUBE</a> | <a href="https://assetstore.unity.com/packages/tools/sprite-management/sprite-sheet-changer-tool-275260">ASSET STORE</a></p>
 
 <p><b>🛑 Problems:</b></p>
 

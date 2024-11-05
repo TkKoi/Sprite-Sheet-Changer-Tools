@@ -8,15 +8,15 @@ namespace SpritesheetChanger.Copy
     public class SpritesheetCopyEditor : EditorWindow
     {
         Object copyFromSptireSheet;
-        List<Object> copyToSptireSheetList = new List<Object>(); // Use a list to store multiple copyTo objects
+        List<Object> copyToSptireSheetList = new List<Object>();
         Vector2 scrollPosition = Vector2.zero;
         private static Texture2D Icon;
 
         public static void ShowWindow()
         {
             SpritesheetCopyEditor window = (SpritesheetCopyEditor)EditorWindow.GetWindow(typeof(SpritesheetCopyEditor));
-            window.minSize = new Vector2(400, 450); // Increased height
-            window.maxSize = window.minSize;
+            window.minSize = new Vector2(400, 450);
+            window.maxSize = new Vector2(400, 450);
             window.Show();
         }
 
@@ -29,74 +29,140 @@ namespace SpritesheetChanger.Copy
         {
             GUILayout.Space(5);
 
+            // Display the icon
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Box(Icon, GUILayout.Width(position.width * 1f), GUILayout.Height(100));
+            GUILayout.Box(Icon, GUILayout.Width(position.width), GUILayout.Height(100));
             EditorGUILayout.EndHorizontal();
 
+            // Field for copyFromSptireSheet and buttons
             GUILayout.BeginHorizontal();
-
             copyFromSptireSheet = EditorGUILayout.ObjectField(GUIContent.none, copyFromSptireSheet, typeof(Texture2D), false, GUILayout.Width(100), GUILayout.Height(100));
             GUILayout.Space(1f);
 
+            // Copy button
             Color originalBackgroundColor = GUI.backgroundColor;
             GUI.backgroundColor = Color.green;
             if (GUILayout.Button("COPY", GUILayout.ExpandWidth(true), GUILayout.Height(100)))
             {
                 CopyData();
             }
-
             GUILayout.Space(1f);
-
-            GUI.backgroundColor = Color.yellow;
-            // Display the "+" button to add a new CopyTo window
-            if (GUILayout.Button("+", GUILayout.Width(100), GUILayout.Height(100)))
-            {
-                AddCopyToWindow();
-            }
 
             GUILayout.EndHorizontal();
 
-            GUI.backgroundColor = Color.white;
-            // Display CopyTo windows with scrolling
-            scrollPosition = GUILayout.BeginScrollView(scrollPosition, GUILayout.Height(206)); // Increased height
-
-            for (int i = 0; i < copyToSptireSheetList.Count; i++)
-            {
-                GUI.backgroundColor = Color.white;
-                GUILayout.BeginHorizontal();
-                copyToSptireSheetList[i] = EditorGUILayout.ObjectField(GUIContent.none, copyToSptireSheetList[i], typeof(Texture2D), false, GUILayout.Width(100), GUILayout.Height(100));
-
-                GUI.backgroundColor = Color.red;
-                // Display the "X" button to remove the corresponding CopyTo window
-                if (GUILayout.Button("X", GUILayout.Width(30), GUILayout.Height(30)))
-                {
-                    RemoveCopyToWindow(i);
-                }
-                GUI.backgroundColor = originalBackgroundColor;
-                // Display the "Open Sprite Editor" button for each CopyTo
-                if (GUILayout.Button("Open Sprite Editor", GUILayout.ExpandWidth(true), GUILayout.Height(30)))
-                {
-                    OpenSpriteEditor(copyToSptireSheetList[i]);
-                }
-
-                GUILayout.Space(1f);
-                GUILayout.EndHorizontal();
-            }
-
-            GUILayout.EndScrollView();
-
-            // Display the "Open Sprite Editor for CopyFrom" button
-            GUILayout.BeginHorizontal();
-            GUILayout.Space(3f);
-
-            if (GUILayout.Button("Open Sprite Editor for CopyFrom", GUILayout.ExpandWidth(true), GUILayout.Height(30)))
+            GUI.backgroundColor = Color.black;
+            // Sprite Editor button
+            if (GUILayout.Button("Sprite Editor", GUILayout.Width(100), GUILayout.Height(25)))
             {
                 OpenSpriteEditor(copyFromSptireSheet);
             }
 
-            GUILayout.EndHorizontal();
+            GUI.backgroundColor = Color.white;
+            // Drop area for spritesheets
+            Event evt = Event.current;
+            Rect dropArea = GUILayoutUtility.GetRect(0, 100, GUILayout.ExpandWidth(true));
+            GUI.Box(dropArea, "");
+
+            GUIStyle centeredStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = true
+            };
+
+            GUI.Label(dropArea, "Drag and drop spritesheets here", centeredStyle);
+
+            if (evt.type == EventType.DragUpdated || evt.type == EventType.DragPerform)
+            {
+                if (dropArea.Contains(evt.mousePosition))
+                {
+                    DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+
+                    if (evt.type == EventType.DragPerform)
+                    {
+                        DragAndDrop.AcceptDrag();
+                        foreach (Object draggedObject in DragAndDrop.objectReferences)
+                        {
+                            if (draggedObject is Texture2D)
+                            {
+                                copyToSptireSheetList.Add(draggedObject);
+                            }
+                        }
+                        evt.Use();
+                    }
+                }
+            }
+
+            // Check for duplicates
+            var duplicateIndices = FindDuplicateIndices();
+            if (duplicateIndices.Count > 0)
+            {
+                EditorGUILayout.HelpBox("Warning: There are duplicate sprites in the list!", MessageType.Warning);
+            }
+
+            // Scroll view for copyToSptireSheetList
+            scrollPosition = GUILayout.BeginScrollView(scrollPosition, GUILayout.ExpandHeight(true));
+
+            for (int i = 0; i < copyToSptireSheetList.Count; i++)
+            {
+                if (copyToSptireSheetList[i] != null) // Ensure the object is not null before accessing it
+                {
+                    GUI.backgroundColor = duplicateIndices.Contains(i) ? Color.red : Color.white;
+
+                    GUILayout.BeginVertical();
+                    GUILayout.BeginHorizontal();
+
+                    // Object field for copyTo
+                    copyToSptireSheetList[i] = EditorGUILayout.ObjectField(GUIContent.none, copyToSptireSheetList[i], typeof(Texture2D), false, GUILayout.Width(100), GUILayout.Height(100));
+
+                    // Remove button
+                    GUI.backgroundColor = Color.red;
+                    if (GUILayout.Button("X", GUILayout.Width(30), GUILayout.Height(30)))
+                    {
+                        RemoveCopyToWindow(i);
+                        // Since we are modifying the list, we need to break out of the loop
+                        break;
+                    }
+                    GUI.backgroundColor = originalBackgroundColor;
+
+                    // Open Sprite Editor button
+                    if (GUILayout.Button("Open Sprite Editor", GUILayout.ExpandWidth(true), GUILayout.Height(30)))
+                    {
+                        OpenSpriteEditor(copyToSptireSheetList[i]);
+                    }
+
+                    GUILayout.EndHorizontal();
+
+                    // Display the sprite name below buttons
+                    string spritePath = AssetDatabase.GetAssetPath(copyToSptireSheetList[i]);
+                    string spriteName = System.IO.Path.GetFileNameWithoutExtension(spritePath);
+                    EditorGUILayout.LabelField(spriteName, GUILayout.ExpandWidth(true));
+
+                    GUILayout.EndVertical();
+                }
+            }
+
+            GUILayout.EndScrollView();
 
             GUILayout.Space(25f);
+        }
+
+        List<int> FindDuplicateIndices()
+        {
+            var duplicateIndices = new List<int>();
+            var seenSprites = new HashSet<string>();
+
+            for (int i = 0; i < copyToSptireSheetList.Count; i++)
+            {
+                if (copyToSptireSheetList[i] != null)
+                {
+                    string spritePath = AssetDatabase.GetAssetPath(copyToSptireSheetList[i]);
+                    if (!seenSprites.Add(spritePath))
+                    {
+                        duplicateIndices.Add(i);
+                    }
+                }
+            }
+            return duplicateIndices;
         }
 
         void CopyData()
@@ -107,7 +173,6 @@ namespace SpritesheetChanger.Copy
                 return;
             }
 
-            // Validate CopyTo objects
             foreach (Object copyToObject in copyToSptireSheetList)
             {
                 if (copyToObject == null)
@@ -118,7 +183,7 @@ namespace SpritesheetChanger.Copy
 
                 if (!(copyFromSptireSheet is Texture2D) || !(copyToObject is Texture2D))
                 {
-                    Debug.LogError($"Needs two Texture2D objects!");
+                    Debug.LogError("Needs two Texture2D objects!");
                     continue;
                 }
 
@@ -143,6 +208,7 @@ namespace SpritesheetChanger.Copy
             sourceImporter.isReadable = true;
             targetImporter.isReadable = true;
 
+            targetImporter.spriteImportMode = SpriteImportMode.Single;
             targetImporter.spriteImportMode = SpriteImportMode.Multiple;
 
             CopySpritesheetData(sourceImporter, targetImporter, targetPath);

@@ -2,6 +2,7 @@ using UnityEditor;
 using UnityEngine;
 using System.Linq;
 using System.Collections.Generic;
+using UnityEditor.U2D.Sprites;
 
 #if UNITY_EDITOR
 
@@ -20,39 +21,29 @@ namespace SpritesheetChanger.Setter
         private Vector2 scrollPosition;
         private static Texture2D Icon;
 
+        private bool individualMode = true;
+        private Vector2 bulkPivot = new Vector2(0.5f, 0.5f);
+
         public static void ShowWindow()
         {
             SpritesheetPivotSetterEditor window = EditorWindow.GetWindow<SpritesheetPivotSetterEditor>();
-            window.InitializeDefaultSpriteSheet(); 
+            window.InitializeDefaultSpriteSheet(); // Initialize with default settings
             window.minSize = new Vector2(400, 500);
             window.maxSize = window.minSize;
-        }
-
-        private void InitializeDefaultSpriteSheet()
-        {
-            spriteSheets.Add(new SpriteSheetData());
+            window.spriteSheets.Clear(); // Clear the list to ensure it starts empty
         }
 
         private void OnEnable()
         {
             Icon = EditorGUIUtility.Load("Assets/SpritesheetChanger/Editor/Media/PivotSetterIcon.png") as Texture2D;
+            InitializeDefaultSpriteSheet(); // Initialize sprite sheets each time the window opens
         }
 
-        private Texture2D MakeBackgroundTexture(int width, int height, Color color)
+        private void InitializeDefaultSpriteSheet()
         {
-            Color[] pixels = new Color[width * height];
-
-            for (int i = 0; i < pixels.Length; i++)
-            {
-                pixels[i] = color;
-            }
-
-            Texture2D backgroundTexture = new Texture2D(width, height);
-
-            backgroundTexture.SetPixels(pixels);
-            backgroundTexture.Apply();
-
-            return backgroundTexture;
+            // Reset sprite sheets each time the window opens
+            spriteSheets.Clear();
+            spriteSheets.Add(new SpriteSheetData());
         }
 
         private void OnGUI()
@@ -62,19 +53,54 @@ namespace SpritesheetChanger.Setter
             GUILayout.Box(Icon, GUILayout.Width(position.width * 1f), GUILayout.Height(100));
             EditorGUILayout.EndHorizontal();
 
-            scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
+            EditorGUILayout.BeginHorizontal();
+            Color originalButtonColor = GUI.backgroundColor;
 
-            List<SpriteSheetData> copyOfSpriteSheets = new List<SpriteSheetData>(spriteSheets);
-
-            foreach (var spriteSheetData in copyOfSpriteSheets)
+            if (individualMode)
             {
-                DrawSpriteSheetUI(spriteSheetData);
-                GUILayout.Space(10);
+                GUI.backgroundColor = Color.clear;
+            }
+            if (GUILayout.Button("Individual Mode", GUILayout.ExpandWidth(true)))
+            {
+                individualMode = true;
+            }
+            GUI.backgroundColor = originalButtonColor;
+
+            if (!individualMode)
+            {
+                GUI.backgroundColor = Color.clear;
+            }
+            if (GUILayout.Button("General Mod", GUILayout.ExpandWidth(true)))
+            {
+                individualMode = false;
+            }
+            GUI.backgroundColor = originalButtonColor;
+
+            EditorGUILayout.EndHorizontal();
+
+            if (spriteSheets.Count == 0)
+            {
+                EditorGUILayout.HelpBox("No sprite sheets found. Drag and drop your sprite sheets here.", MessageType.Info);
+            }
+            else
+            {
+                scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
+
+                List<SpriteSheetData> copyOfSpriteSheets = new List<SpriteSheetData>(spriteSheets);
+
+                foreach (var spriteSheetData in copyOfSpriteSheets)
+                {
+                    DrawSpriteSheetUI(spriteSheetData);
+                    GUILayout.Space(10);
+                }
+
+                EditorGUILayout.EndScrollView();
             }
 
-            EditorGUILayout.EndScrollView();
-
             GUILayout.Space(10);
+
+            // Drag and drop area
+            DrawDragAndDropArea();
 
             EditorGUILayout.BeginHorizontal();
 
@@ -89,32 +115,95 @@ namespace SpritesheetChanger.Setter
             }
 
             GUI.backgroundColor = Color.yellow;
-            if (GUILayout.Button("[+] Add new", GUILayout.MinHeight(50)))
+            // Button to add new sprite sheet
+            if (GUILayout.Button("[+] Add New", GUILayout.MinHeight(50)))
             {
                 spriteSheets.Add(new SpriteSheetData());
             }
 
-            GUI.backgroundColor = Color.green;
-            if (GUILayout.Button("Modify Pivot for All", GUILayout.MinHeight(50)))
-            {
-                ModifyPivotForAll();
-            }
-
-            GUI.backgroundColor = originalBackgroundColor;
 
             EditorGUILayout.EndHorizontal();
 
             GUILayout.Space(10);
+
+            if (!individualMode)
+            {
+                GUI.backgroundColor = Color.white;
+                GUILayout.Label("Set General Pivot", EditorStyles.boldLabel);
+                bulkPivot.x = Mathf.Clamp01(EditorGUILayout.FloatField("Pivot X", bulkPivot.x));
+                bulkPivot.y = Mathf.Clamp01(EditorGUILayout.FloatField("Pivot Y", bulkPivot.y));
+
+                GUI.backgroundColor = Color.green;
+                if (GUILayout.Button("Apply", GUILayout.MinHeight(50)))
+                {
+                    SetBulkPivot();
+                }
+            }
+
+
+            if (individualMode)
+            {
+                GUI.backgroundColor = Color.green;
+                if (GUILayout.Button("Apply All Pivot", GUILayout.MinHeight(50)))
+                {
+                    ApplyAllPivots();
+                }
+            }
+        }
+
+        private void ApplyAllPivots()
+        {
+            foreach (var spriteSheetData in spriteSheets)
+            {
+                if (spriteSheetData.spriteSheet != null)
+                {
+                    ModifyPivot(spriteSheetData);
+                }
+            }
+            Debug.Log("All individual pivots applied successfully.");
+        }
+
+        private void DrawDragAndDropArea()
+        {
+            GUIStyle centeredStyle = new GUIStyle(GUI.skin.box)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = true
+            };
+            Rect dropArea = GUILayoutUtility.GetRect(0, 60, GUILayout.ExpandWidth(true));
+            GUI.backgroundColor = Color.black;
+            GUI.Box(dropArea, "Drag & Drop Sprite Sheets Here", centeredStyle);
+
+            Event e = Event.current;
+            if (dropArea.Contains(e.mousePosition))
+            {
+                switch (e.type)
+                {
+                    case EventType.DragUpdated:
+                    case EventType.DragPerform:
+                        DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+                        if (e.type == EventType.DragPerform)
+                        {
+                            DragAndDrop.AcceptDrag();
+                            foreach (Object obj in DragAndDrop.objectReferences)
+                            {
+                                if (obj is Texture2D texture && !spriteSheets.Any(s => s.spriteSheet == texture))
+                                {
+                                    spriteSheets.Add(new SpriteSheetData { spriteSheet = texture });
+                                }
+                            }
+                        }
+                        break;
+                }
+            }
         }
 
         private void DrawSpriteSheetUI(SpriteSheetData spriteSheetData)
         {
             GUILayout.Label("Sprite Sheet", EditorStyles.boldLabel);
-
             EditorGUILayout.BeginHorizontal();
 
             EditorGUILayout.BeginVertical(GUILayout.Width(position.width / 2));
-
             EditorGUI.BeginChangeCheck();
             spriteSheetData.spriteSheet = (Texture2D)EditorGUILayout.ObjectField(spriteSheetData.spriteSheet, typeof(Texture2D), false, GUILayout.Width(100), GUILayout.Height(100));
             if (EditorGUI.EndChangeCheck())
@@ -143,43 +232,51 @@ namespace SpritesheetChanger.Setter
 
             EditorGUILayout.EndVertical();
 
-            EditorGUILayout.BeginVertical(GUILayout.MinWidth(0), GUILayout.MaxWidth(20));
+            if (individualMode)
+            {
+                EditorGUILayout.BeginVertical(GUILayout.Width(position.width / 2));
+                GUILayout.Label("Custom Pivot", EditorStyles.boldLabel);
 
-            GUILayout.Label("Custom Pivot", EditorStyles.boldLabel);
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Label("Pivot X", GUILayout.Width(80));
+                spriteSheetData.customPivot.x = Mathf.Clamp01(EditorGUILayout.FloatField(spriteSheetData.customPivot.x, GUILayout.Width(100))); // Управляем шириной FloatField
+                EditorGUILayout.EndHorizontal();
 
-            EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Label("Pivot Y", GUILayout.Width(80));
+                spriteSheetData.customPivot.y = Mathf.Clamp01(EditorGUILayout.FloatField(spriteSheetData.customPivot.y, GUILayout.Width(100))); // Управляем шириной FloatField
+                EditorGUILayout.EndHorizontal();
 
-            GUILayout.Label("X", GUILayout.Width(12));
-            spriteSheetData.customPivot.x = Mathf.Clamp01(EditorGUILayout.FloatField(spriteSheetData.customPivot.x));
+                EditorGUILayout.EndVertical();
+            }
 
-            GUILayout.Label("Y", GUILayout.Width(12));
-            spriteSheetData.customPivot.y = Mathf.Clamp01(EditorGUILayout.FloatField(spriteSheetData.customPivot.y));
+
 
             EditorGUILayout.EndHorizontal();
 
-            EditorGUILayout.EndVertical();
 
-            EditorGUILayout.EndHorizontal();
 
-            GUILayout.Space(10);
-
-            GUIStyle boldButtonStyle = new GUIStyle(GUI.skin.button);
-            boldButtonStyle.fontStyle = FontStyle.Bold;
-
-            if (GUILayout.Button("Modify Pivot", boldButtonStyle, GUILayout.MinHeight(30), GUILayout.MinWidth(30)))
+            if (individualMode)
             {
-                ModifyPivot(spriteSheetData);
+                GUI.backgroundColor = Color.green;
+                if (GUILayout.Button("Modify Pivot", GUILayout.MinHeight(30), GUILayout.MinWidth(30)))
+                {
+                    ModifyPivot(spriteSheetData);
+                }
+                GUI.backgroundColor = Color.white;
             }
 
-            if (GUILayout.Button("Open Sprite Editor", boldButtonStyle, GUILayout.MinHeight(30), GUILayout.MinWidth(30)))
+            if (GUILayout.Button("Open Sprite Editor", GUILayout.MinHeight(30), GUILayout.MinWidth(30)))
             {
-                OpenSpriteRenderer(spriteSheetData);
+                OpenSpriteEditor(spriteSheetData.spriteSheet);
             }
 
-            if (GUILayout.Button("REMOVE", boldButtonStyle, GUILayout.MinHeight(50), GUILayout.MinWidth(50)))
+            GUI.backgroundColor = Color.red;
+            if (GUILayout.Button("REMOVE", GUILayout.MinHeight(50), GUILayout.MinWidth(50)))
             {
                 spriteSheets.Remove(spriteSheetData);
             }
+            GUI.backgroundColor = Color.white;
         }
 
         private void ModifyPivot(SpriteSheetData spriteSheetData)
@@ -211,7 +308,7 @@ namespace SpritesheetChanger.Setter
             for (int i = 0; i < spriteSheet.Length; i++)
             {
                 updatedSpriteSheet[i] = spriteSheet[i];
-                updatedSpriteSheet[i].pivot = spriteSheetData.customPivot;
+                updatedSpriteSheet[i].pivot = spriteSheetData.customPivot; // Используйте customPivot из spriteSheetData
                 updatedSpriteSheet[i].alignment = (int)SpriteAlignment.Custom;
             }
 
@@ -223,65 +320,36 @@ namespace SpritesheetChanger.Setter
             Debug.Log("Sprite pivots modified successfully for Sprite Sheet: " + spriteSheetData.spriteSheet.name);
         }
 
-        private void OpenSpriteRenderer(SpriteSheetData spriteSheetData)
+        private void SetBulkPivot()
         {
-            if (spriteSheetData.spriteSheet == null)
+            foreach (var spriteSheetData in spriteSheets)
             {
-                Debug.LogError("Please assign the Sprite Sheet!");
-                return;
+                spriteSheetData.customPivot = bulkPivot;
+                ModifyPivot(spriteSheetData);
             }
+            Debug.Log("Bulk pivot set for all sprite sheets.");
+        }
 
-            string path = AssetDatabase.GetAssetPath(spriteSheetData.spriteSheet);
-            Object spriteRendererObject = AssetDatabase.LoadAssetAtPath<Object>(path);
-
-            if (spriteRendererObject != null)
+       void OpenSpriteEditor(Object targetObject)
+        {
+            if (targetObject != null)
             {
-                Selection.activeObject = spriteRendererObject;
-                EditorApplication.ExecuteMenuItem("Window/2D/Sprite Editor");
+                string copyToPath = AssetDatabase.GetAssetPath(targetObject);
+                Object spriteRendererObject = AssetDatabase.LoadAssetAtPath<Object>(copyToPath);
+
+                if (spriteRendererObject != null)
+                {
+                    Selection.activeObject = spriteRendererObject;
+                    EditorApplication.ExecuteMenuItem("Window/2D/Sprite Editor");
+                }
+                else
+                {
+                    Debug.LogError("Failed to load Sprite Editor for the specified object!");
+                }
             }
             else
             {
-                Debug.LogError("Failed to load Sprite Renderer for the Sprite Sheet!");
-            }
-        }
-
-        private void ModifyPivotForAll()
-        {
-            bool allSheetsComplete = true;
-
-            foreach (var spriteSheetData in spriteSheets.ToList())
-            {
-                if (spriteSheetData.spriteSheet == null || spriteSheetData.customPivot == null)
-                {
-                    Debug.LogError("Please fill in all Sprite Sheets before modifying pivots.");
-                    allSheetsComplete = false;
-                    break;
-                }
-            }
-
-            if (allSheetsComplete)
-            {
-                foreach (var spriteSheetData in spriteSheets.ToList())
-                {
-                    string path = AssetDatabase.GetAssetPath(spriteSheetData.spriteSheet);
-                    TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
-
-                    if (importer == null)
-                    {
-                        Debug.LogError("Failed to get TextureImporter for the Sprite Sheet!");
-                        continue;
-                    }
-
-                    if (importer.spriteImportMode != SpriteImportMode.Multiple)
-                    {
-                        Debug.LogError("Sprite Mode must be set to Multiple. Please change it in the Texture Import Settings.");
-                        return;
-                    }
-
-                    ModifyPivot(spriteSheetData);
-                }
-
-                Debug.Log("Sprite pivots modified successfully for all Sprite Sheets!");
+                Debug.LogError("Cannot open Sprite Editor for a null object!");
             }
         }
 
@@ -292,5 +360,4 @@ namespace SpritesheetChanger.Setter
         }
     }
 }
-
 #endif
